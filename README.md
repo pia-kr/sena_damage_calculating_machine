@@ -58,4 +58,3 @@ A 4-turn damage calculator for the Destroyer God encounter in Seven Knights Re:B
 - 토벌·공성·복수가 아닌 반지와 세공 반지는 **기타**로 선택하면 됩니다.
 - 게임 내 세부 규칙 또는 밸런스 변경에 따라 결과가 달라질 수 있습니다.
 
-Made by 잠자요.
