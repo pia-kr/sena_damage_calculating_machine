@@ -27,4 +27,3 @@ A 4-turn damage calculator for the Destroyer God encounter in Seven Knights Re:B
 - Select **Other** for rings and crafting rings that are not Hunt, Siege, or Avenger.
 - Results may differ if game mechanics or balance values change.
 
-Made by 잠자요.
