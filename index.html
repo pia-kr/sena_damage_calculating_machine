@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>세나리 파괴신 1라운드 계산기</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231d2733'/%3E%3Cpath d='M32 10 39 25l15 2-11 11 3 16-14-8-14 8 3-16L10 27l15-2z' fill='%23f5b700'/%3E%3C/svg%3E">
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; color: #1d2733; background: #fafafa; }
+    main { max-width: 1280px; margin: auto; }
+    fieldset { margin: 16px 0; padding: 14px; background: #fff; border: 1px solid #ccd3da; }
+    legend { font-weight: 700; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+    label { display: grid; gap: 4px; font-size: 14px; }
+    input, select, button { font: inherit; padding: 6px; }
+    .party { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; min-width: 1050px; }
+    th, td { border: 1px solid #ccd3da; padding: 7px; vertical-align: middle; }
+    th { background: #edf1f5; }
+    .hint { font-size: 13px; color: #586574; }
+    .byline { margin-top: -12px; color: #586574; }
+    details { margin: 16px 0; padding: 10px 14px; background: #fff; border: 1px solid #ccd3da; }
+    summary { cursor: pointer; font-weight: 700; }
+    .error { color: #b42318; font-weight: 700; white-space: pre-line; }
+    .success { color: #087443; font-weight: 700; }
+    #result { background: #fff; border: 1px solid #ccd3da; padding: 14px; }
+    #summary { font-size: 18px; font-weight: 700; }
+    #log { width: 100%; border-collapse: collapse; margin-top: 12px; min-width: 760px; }
+    #log td, #log th { font-size: 14px; }
+    .damage { text-align: right; white-space: nowrap; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>나는 과연 4턴컷을 할 수 있을까?</h1>
+  <p class="byline">made by 잠자요</p>
+
+  <details><summary>설명서</summary><ol>
+    <li>본 계산기는 파괴신 4턴 계산기로 소교 2 → 파스칼 2의 스킬 순서만 고려합니다.</li>
+    <li>캐릭터 패시브 및 스킬은 스강 기준이며 평타만 강화 여부를 고를 수 있습니다.</li>
+    <li>밀리아를 조합에 넣을 때 말고는 스탯창 방어력은 고려하지 않아도 상관 없습니다.</li>
+    <li>치명타와 약공은 확률로 고려하지 않고 ON/OFF 체크 표시하면 됩니다.</li>
+    <li>반지에서 토벌·공성·복수가 아닌 반지 및 세공은 기타로 표시하면 됩니다.</li>
+  </ol></details>
+
+  <form id="calculator">
+    <fieldset>
+      <legend>공통 설정</legend>
+      <div class="grid">
+        <label>펫<select id="pet"><option value="zeo">제오 (전설 +5)</option></select></label>
+        <label>제오 스킬 레벨<select id="petLevel"><option value="0">0레벨</option><option value="1">1레벨</option><option value="2">2레벨</option><option value="3" selected>3레벨</option></select></label>
+        <label>제오 스킬 효과<span>전투 시작 시 자동 적용</span></label>
+        <label>펫 잠재력 모든 공격력 합계 (%)<input id="petPotential" type="number" min="0" step="0.1" value="0"></label>
+        <label>진형<select id="formation"><option value="protection">보호 진형 Lv.40</option><option value="balance">밸런스 진형 Lv.40</option></select></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>파티 5명</legend>
+      <p class="hint">고정 예약 스킬 규칙 때문에 소교와 파스칼은 반드시 포함됩니다. 속공 1~3위만 평타를 사용합니다. 진형 자리와 속공 순위는 중복될 수 없습니다. 스킬·패시브 강화는 항상 완료 수치이며, 평타 강화만 캐릭터별로 선택합니다.</p>
+      <div class="party"><table>
+        <thead><tr><th>슬롯</th><th>캐릭터</th><th>평타 강화</th><th>속공 순위</th><th>진형 자리</th><th>스탯창 공격력</th><th>스탯창 방어력<br><small>(밀리아만 사용)</small></th><th>치명타 피해 (%)</th><th>전용장비 피해 증폭 (%)</th><th>무기·방어구</th><th>세트</th><th>주 반지</th><th>세공 반지</th></tr></thead>
+        <tbody id="partyRows"></tbody>
+      </table></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>공격별 수동 판정</legend>
+      <div class="grid" id="eventControls"></div>
+    </fieldset>
+    <button type="submit">4턴 피해 계산</button>
+  </form>
+
+  <section id="result" aria-live="polite">
+    <div id="summary">입력 후 계산을 누르세요.</div>
+    <div class="party" id="logWrap"></div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const HEROES = {
+    pascal: { name: '파스칼', type: 'magic', atk: 1500, def: 571, passiveMagicAtk: [.27, .33], passiveCrit: .40, basic: { ratio: 1, enhancedRatio: 1.20, targets: 1 }, skill2: { ratio: 3.90, enhancedRatio: 4.70, targets: 1, ignore: .65 } },
+    regin: { name: '레긴레이프', type: 'magic', atk: 1500, def: 571, defenseReduction: .24, basic: { ratio: 1, enhancedRatio: 1.30, targets: 1 } },
+    sogyo: { name: '소교', type: 'magic', atk: 1500, def: 571, passiveMagicDamage: [.24, .29], basic: { ratio: 1, enhancedRatio: 1.20, targets: 1 }, skill2: { ratio: 3.40, targets: 1, ignore: .40 } },
+    miho: { name: '미호', type: 'magic', atk: 1500, def: 571, basic: { ratio: 1, enhancedRatio: 1.20, targets: 1 }, weakDamage: .23 },
+    sunran: { name: '선란', type: 'physical', atk: 1712, def: 668, basic: { ratio: 1.45, targets: 1 }, globalPhysicalAtk: .25, selfPhysicalAtk: .21, selfCrit: .30 },
+    milia: { name: '밀리아', type: 'magic', atk: 1500, def: 1580, basic: { ratio: .30, defenseRatio: .35, targets: 2 }, permanentMagicVulnerability: [.17, .20] }
+  };
+  const PET = { flatAtk: 564, flatDef: 344, levels: [{ dmg: .12, atk: .29 }, { dmg: .12, atk: .32 }, { dmg: .13, atk: .34 }, { dmg: .14, atk: .37 }] };
+  const FORMATIONS = { protection: { name: '보호', rear: [5], atk: .42, def: .105 }, balance: { name: '밸런스', rear: [4,5], atk: .21, def: .14 } };
+  const SLOT_DEFAULTS = ['regin', 'sogyo', 'miho', 'sunran', 'pascal'];
+  const EVENT_DEFS = [
+    ['sogyoSkill', '0턴 소교 2스킬'], ['rank1', '2턴 속공 1위 평타'], ['rank2', '3턴 속공 2위 평타'], ['rank3', '4턴 속공 3위 평타'], ['pascalSkill', '4턴 파스칼 2스킬']
+  ];
+  const fmt = n => new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 2 }).format(n);
+  const fmtDamage = n => new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 }).format(Math.floor(n));
+  const partyRows = document.querySelector('#partyRows');
+  const eventControls = document.querySelector('#eventControls');
+  const heroOptions = () => Object.entries(HEROES).map(([id,h]) => `<option value="${id}">${h.name}</option>`).join('');
+
+  SLOT_DEFAULTS.forEach((hero, i) => {
+    partyRows.insertAdjacentHTML('beforeend', `<tr data-slot="${i}">
+      <td>${i + 1}</td><td><select class="hero">${heroOptions()}</select></td><td><label><input class="basicEnhanced" type="checkbox" checked> 완료</label></td>
+      <td><select class="rank"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></td>
+      <td><select class="position"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></td>
+      <td><input class="statAtk" type="number" min="0" step="1"></td>
+      <td><input class="statDef" type="number" min="0" step="1"></td>
+      <td><input class="critDamage" type="number" min="0" step="0.1" value="174"></td>
+      <td><input class="amplification" type="number" min="0" step="0.1" value="0"></td>
+      <td><select class="gear"><option value="tracker">추적자</option><option value="assassin">암살자</option><option value="avenger" selected>복수자</option><option value="other">그외</option></select></td>
+      <td><select class="set"><option value="none">세트 없음</option><option value="4" selected>4세트</option></select></td>
+      <td><select class="mainRing"><option value="hunt">토벌</option><option value="siege">공성</option><option value="revenge">복수</option><option value="other">기타</option></select></td>
+      <td><select class="craftRing"><option value="hunt">토벌</option><option value="siege">공성</option><option value="revenge">복수</option><option value="other" selected>기타</option></select></td>
+    </tr>`);
+    const row = partyRows.lastElementChild;
+    row.querySelector('.hero').value = hero;
+    row.querySelector('.rank').value = i + 1;
+    row.querySelector('.position').value = i + 1;
+    row.querySelector('.statAtk').value = HEROES[hero].atk;
+    row.querySelector('.statDef').value = HEROES[hero].def;
+  });
+  EVENT_DEFS.forEach(([id,label]) => eventControls.insertAdjacentHTML('beforeend', `<label>${label}<span><input id="${id}Crit" type="checkbox" checked> 치명타 &nbsp; <input id="${id}Weak" type="checkbox" checked> 약점</span></label>`));
+  partyRows.addEventListener('change', e => {
+    if (!e.target.classList.contains('hero')) return;
+    const h = HEROES[e.target.value]; const row = e.target.closest('tr');
+    row.querySelector('.statAtk').value = h.atk; row.querySelector('.statDef').value = h.def;
+  });
+
+  function selectedParty() {
+    return [...partyRows.querySelectorAll('tr')].map(row => ({
+      id: row.querySelector('.hero').value,
+      rank: +row.querySelector('.rank').value,
+      position: +row.querySelector('.position').value,
+      basicEnhanced: row.querySelector('.basicEnhanced').checked,
+      statAtk: +row.querySelector('.statAtk').value,
+      statDef: +row.querySelector('.statDef').value,
+      critDamage: +row.querySelector('.critDamage').value / 100,
+      amp: +row.querySelector('.amplification').value / 100,
+      gear: row.querySelector('.gear').value,
+      set: row.querySelector('.set').value,
+      mainRing: row.querySelector('.mainRing').value,
+      craftRing: row.querySelector('.craftRing').value
+    }));
+  }
+  function validate(party) {
+    const ids = party.map(x => x.id), ranks = party.map(x => x.rank), positions = party.map(x => x.position);
+    const errors = [];
+    if (new Set(ids).size !== 5) errors.push('캐릭터는 중복 선택할 수 없습니다.');
+    if (!ids.includes('sogyo') || !ids.includes('pascal')) errors.push('고정 예약 스킬을 위해 소교와 파스칼을 모두 편성하세요.');
+    if (new Set(ranks).size !== 5) errors.push('속공 순위는 1~5를 각각 한 번씩 선택하세요.');
+    if (new Set(positions).size !== 5) errors.push('진형 자리는 1~5를 각각 한 번씩 선택하세요.');
+    if (party.some(x => !Number.isFinite(x.statAtk) || x.statAtk < 0 || !Number.isFinite(x.statDef) || x.statDef < 0)) errors.push('공격력과 방어력은 0 이상의 숫자로 입력하세요.');
+    return errors;
+  }
+  function getEvent(id) { return { crit: document.querySelector(`#${id}Crit`).checked, weak: document.querySelector(`#${id}Weak`).checked }; }
+  function calculate(party) {
+    const formation = FORMATIONS[document.querySelector('#formation').value];
+    const pet = PET.levels[+document.querySelector('#petLevel').value];
+    const petSkillActive = true;
+    const petPotential = +document.querySelector('#petPotential').value / 100 || 0;
+    const byId = Object.fromEntries(party.map(x => [x.id, x]));
+    const has = id => Boolean(byId[id]);
+    const enhancedValue = value => Array.isArray(value) ? value[1] : value;
+    const activeSkill = (h, skill, basic = false) => ({ ...skill, ratio: basic && !h.basicEnhanced ? skill.ratio : (skill.enhancedRatio || skill.ratio) });
+    const allMagic = party.every(x => HEROES[x.id].type === 'magic');
+    const state = { sogyoTargets: [], sogyoVulnerability: false, reginVulnerability: false, sunranDefenseDown: false, log: [] };
+    const isRear = h => formation.rear.includes(h.position);
+    const formationAtk = h => isRear(h) ? formation.atk : 0;
+    const formationDef = h => isRear(h) ? 0 : formation.def;
+    const rawBattleAttack = h => h.statAtk + HEROES[h.id].atk * (petPotential + formationAtk(h)) + PET.flatAtk;
+    const attackBuff = (h, includeSogyo) => {
+      const hero = HEROES[h.id];
+      let buff = petSkillActive ? pet.atk : 0;
+      if (hero.type === 'magic' && hero.passiveMagicAtk) buff += enhancedValue(hero.passiveMagicAtk);
+      if (hero.type === 'physical' && has('sunran')) buff += HEROES.sunran.globalPhysicalAtk;
+      if (h.id === 'sunran') buff += HEROES.sunran.selfPhysicalAtk;
+      if (includeSogyo && state.sogyoTargets.includes(h.id) && hero.type === 'magic') buff += .31;
+      return buff;
+    };
+    const baseBattleAttack = h => rawBattleAttack(h) * (1 + attackBuff(h, false));
+    const attack = h => rawBattleAttack(h) * (1 + attackBuff(h, true));
+    const defense = h => h.statDef + HEROES[h.id].def * formationDef(h) + PET.flatDef;
+    const critFactor = (h, active) => {
+      if (!active) return 1;
+      let value = h.critDamage;
+      if (HEROES[h.id].passiveCrit) value += HEROES[h.id].passiveCrit;
+      if (state.sogyoTargets.includes(h.id)) value += .46;
+      return Math.max(1, value);
+    };
+    const damageFactors = (h, targets, type) => {
+      const rings = [h.mainRing, h.craftRing];
+      const avenger = h.set === '4' && h.gear === 'avenger';
+      return {
+        damageIncrease: 1 + (petSkillActive ? pet.dmg : 0) + (avenger ? .70 : 0) + rings.filter(r => r === 'hunt').length * .12 + (type === 'magic' && HEROES[h.id].passiveMagicDamage ? enhancedValue(HEROES[h.id].passiveMagicDamage) : 0),
+        damageDealt: 1 + rings.filter(r => r === 'revenge').length * .06,
+        skillDamage: 1 + (targets <= 3 ? rings.filter(r => r === 'siege').length * .10 : 0)
+      };
+    };
+    const defenseIgnore = (h, skillIgnore = 0) => Math.min(.95, skillIgnore + (h.set === '4' && h.gear === 'assassin' ? .15 : 0));
+    const effectiveDefense = (h, skillIgnore) => {
+      const defenseReduction = (has('regin') ? HEROES.regin.defenseReduction : 0) + (state.sunranDefenseDown ? .36 : 0);
+      return 1510 * (1 - defenseReduction) * (1 - defenseIgnore(h, skillIgnore));
+    };
+    const weakFactor = (h, active) => !active ? 1 : 1.30 + (has('miho') ? .23 : 0) + (h.set === '4' && h.gear === 'tracker' ? .35 : 0);
+    const vulnerability = type => type === 'physical' ? 1 : (has('milia') ? 1 + enhancedValue(HEROES.milia.permanentMagicVulnerability) : 1) * (state.sogyoVulnerability ? 1.26 : 1) * (state.reginVulnerability ? 1.10 : 1);
+    function damage(h, skill, type, flags, label) {
+      const source = HEROES[h.id];
+      const base = attack(h) * skill.ratio + (skill.defenseRatio ? defense(h) * skill.defenseRatio : 0);
+      const def = effectiveDefense(h, skill.ignore || 0);
+      const coef = 1 + def * .0021413276;
+      const crit = critFactor(h, flags.crit), weak = weakFactor(h, flags.weak), factors = damageFactors(h, skill.targets, type), vuln = vulnerability(type), amp = 1 + h.amp, resistance = type === 'physical' ? .10 : 1;
+      const totalDamageFactor = Object.values(factors).reduce((product, value) => product * value, 1);
+      const result = base / coef * crit * weak * totalDamageFactor * vuln * amp * resistance;
+      state.log.push({ phase: label, hero: source.name, type: type === 'magic' ? '마법' : '물리', detail: `기초 ${fmtDamage(base)} / 방어계수 ${fmt(coef)} / 방무 ${fmt(defenseIgnore(h, skill.ignore || 0) * 100)}% / 치명 x${fmt(crit)} / 약점 x${fmt(weak)} / 피해증가 x${fmt(factors.damageIncrease)} / 주는피해 x${fmt(factors.damageDealt)} / 스킬피해 x${fmt(factors.skillDamage)} / 취약 x${fmt(vuln)} / 증폭 x${fmt(amp)}${resistance < 1 ? ` / 물리감쇠 x${fmt(resistance)}` : ''}`, damage: result });
+      return result;
+    }
+    // 0T: Sogyo S2 applies its ally buffs before dealing damage, then magic vulnerability after damage.
+    state.sogyoTargets = ['sogyo', 'pascal'];
+    const sogyoDamage = damage(byId.sogyo, activeSkill(byId.sogyo, HEROES.sogyo.skill2), 'magic', getEvent('sogyoSkill'), '0턴 소교 2스킬');
+    state.sogyoVulnerability = true;
+    state.log.push({ phase: '0턴 효과', hero: '소교', type: '상태', detail: `상위 2명(${state.sogyoTargets.map(id => HEROES[id].name).join(', ')}) 마법 공격력 +31%, 치명타 피해 +46%; 파괴신 마법 취약 +26%`, damage: 0 });
+    // 1T: Sunran's superiority is evaluated when the boss hits the party.
+    if (has('sunran')) {
+      const sunranAtk = attack(byId.sunran);
+      if (sunranAtk > 4066) {
+        state.sunranDefenseDown = true;
+        state.log.push({ phase: '1턴 파괴신 평타', hero: '선란', type: '상태', detail: `선란 공격력 ${fmt(sunranAtk)} > 4,066 → 우위: 파괴신 방어력 -36%`, damage: 0 });
+      } else state.log.push({ phase: '1턴 파괴신 평타', hero: '선란', type: '상태', detail: `선란 공격력 ${fmt(sunranAtk)} ≤ 4,066 → 우위 미발동`, damage: 0 });
+    } else state.log.push({ phase: '1턴 파괴신 평타', hero: '-', type: '상태', detail: '선란 미편성 → 우위 미발동', damage: 0 });
+    // 2~4T speed ranks 1~3 basic attacks.
+    [1,2,3].forEach((rank, index) => {
+      const h = party.find(x => x.rank === rank), hero = HEROES[h.id];
+      damage(h, activeSkill(h, hero.basic, true), hero.type, getEvent(`rank${rank}`), `${index + 2}턴 속공 ${rank}위 평타`);
+      if (h.id === 'regin' && allMagic) {
+        state.reginVulnerability = true;
+        state.log.push({ phase: `${index + 2}턴 효과`, hero: '레긴레이프', type: '상태', detail: '마법형 5명 편성 → 파괴신 마법 취약 +10%', damage: 0 });
+      }
+    });
+    damage(byId.pascal, activeSkill(byId.pascal, HEROES.pascal.skill2), 'magic', getEvent('pascalSkill'), '4턴 파스칼 2스킬');
+    return state;
+  }
+  document.querySelector('#calculator').addEventListener('submit', e => {
+    e.preventDefault(); const party = selectedParty(); const errors = validate(party); const summary = document.querySelector('#summary'); const logWrap = document.querySelector('#logWrap');
+    if (errors.length) { summary.className = 'error'; summary.textContent = errors.join('\n'); logWrap.innerHTML = ''; return; }
+    const state = calculate(party); const total = state.log.reduce((sum, x) => sum + x.damage, 0);
+    summary.className = total >= 1000000 ? 'success' : '';
+    summary.textContent = `누적 피해 ${fmtDamage(total)} / 1,000,000 · ${total >= 1000000 ? '처치 가능' : `부족 ${fmtDamage(1000000 - total)}`}`;
+    logWrap.innerHTML = `<table id="log"><thead><tr><th>순서</th><th>행동/효과</th><th>캐릭터</th><th>유형</th><th>계산 상태</th><th>피해</th></tr></thead><tbody>${state.log.map((x,i) => `<tr><td>${i+1}</td><td>${x.phase}</td><td>${x.hero}</td><td>${x.type}</td><td>${x.detail}</td><td class="damage">${x.damage ? fmtDamage(x.damage) : '-'}</td></tr>`).join('')}</tbody></table>`;
+  });
+})();
+</script>
+</body>
+</html>
+
