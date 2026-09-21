@@ -192,10 +192,13 @@
     const damageFactors = (h, targets, type) => {
       const rings = [h.mainRing, h.craftRing];
       const avenger = h.set === '4' && h.gear === 'avenger';
+      const ringDamageIncrease = rings.filter(r => r === 'hunt').length * .12
+        + rings.filter(r => r === 'revenge').length * .06
+        + (targets <= 3 ? rings.filter(r => r === 'siege').length * .10 : 0);
       return {
-        damageIncrease: 1 + (petSkillActive ? pet.dmg : 0) + (avenger ? .70 : 0) + rings.filter(r => r === 'hunt').length * .12 + (type === 'magic' && HEROES[h.id].passiveMagicDamage ? enhancedValue(HEROES[h.id].passiveMagicDamage) : 0),
-        damageDealt: 1 + rings.filter(r => r === 'revenge').length * .06,
-        skillDamage: 1 + (targets <= 3 ? rings.filter(r => r === 'siege').length * .10 : 0)
+        damageIncrease: 1 + (petSkillActive ? pet.dmg : 0) + (avenger ? .70 : 0) + ringDamageIncrease + (type === 'magic' && HEROES[h.id].passiveMagicDamage ? enhancedValue(HEROES[h.id].passiveMagicDamage) : 0),
+        damageDealt: 1,
+        skillDamage: 1
       };
     };
     const defenseIgnore = (h, skillIgnore = 0) => Math.min(.95, skillIgnore + (h.set === '4' && h.gear === 'assassin' ? .15 : 0));
@@ -204,7 +207,10 @@
       return 1510 * (1 - defenseReduction) * (1 - defenseIgnore(h, skillIgnore));
     };
     const weakFactor = (h, active) => !active ? 1 : 1.30 + (has('miho') ? .23 : 0) + (h.set === '4' && h.gear === 'tracker' ? .35 : 0);
-    const vulnerability = type => type === 'physical' ? 1 : (has('milia') ? 1 + enhancedValue(HEROES.milia.permanentMagicVulnerability) : 1) * (state.sogyoVulnerability ? 1.26 : 1) * (state.reginVulnerability ? 1.10 : 1);
+    const vulnerability = type => type === 'physical' ? 1 : 1
+      + (has('milia') ? enhancedValue(HEROES.milia.permanentMagicVulnerability) : 0)
+      + (state.sogyoVulnerability ? .26 : 0)
+      + (state.reginVulnerability ? .10 : 0);
     function damage(h, skill, type, flags, label) {
       const source = HEROES[h.id];
       const base = attack(h) * skill.ratio + (skill.defenseRatio ? defense(h) * skill.defenseRatio : 0);
